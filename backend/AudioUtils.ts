@@ -1,39 +1,93 @@
-import ytdl from "ytdl-core";
+import ytdl, { downloadOptions } from "ytdl-core";
 import * as fs from "fs";
-import { OpenAI } from "openai-streams/node";
+import {
+  OpenAIAudioTranscriptionPayload,
+  OpenAIAudioTranscriptionRequest,
+  OpenAIChatCompletionPayload,
+  OpenAIChatCompletionRequest,
+} from "./OpenAIRequest";
 
-export interface OpenAIAudioTranscriptionRequest {
-  file: string;
-  model: string;
-  prompt?: string;
-  response_format?: string;
-  temperature?: number;
-  language?: string;
-}
+import { exec, spawn } from "child_process";
 
-export async function downloadAudio() {
-  ytdl("https://www.youtube.com/watch?v=aqz-KE-bpKQ", {
-    filter: "audioonly",
-    quality: "lowestaudio",
-  })
-    .pipe(fs.createWriteStream("video.mp3"))
-    .on("finish", () => {
-      console.log("file downloaded");
-    });
-}
+import { Options, PythonShell } from "python-shell";
 
-export async function sendAudioToWhisper(
-  payload: OpenAIAudioTranscriptionRequest
-) {
-  const res = await fetch(
-    "https://api.openai.com/v1/chat/audio/transcriptions",
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
-      },
-      method: "POST",
-      body: JSON.stringify(payload),
+export async function downloadAudio(
+  url: string,
+  saveFile: string
+): Promise<string> {
+  if (fs.existsSync(saveFile)) return saveFile;
+  return new Promise(async (resolve) => {
+    console.log("dwonloading");
+    try {
+      ytdl(url, {
+        filter: "audioonly",
+        quality: "lowestaudio",
+      })
+        .on("progress", ({}, downloaded, total) =>
+          console.log(
+            `Downloading audio... ${((downloaded / total) * 100).toFixed(2)}%`
+          )
+        )
+        .pipe(fs.createWriteStream(saveFile))
+        .on("finish", () => {
+          console.log("file downloaded");
+          resolve(saveFile);
+        });
+    } catch (err) {
+      console.log(err);
     }
-  );
+  });
+}
+
+export async function transcribeAudio(
+  payload: OpenAIAudioTranscriptionPayload
+) {
+  const response = await OpenAIAudioTranscriptionRequest(payload);
+
+  return response;
+}
+
+export async function summarizeAudioTranscript(
+  payload: OpenAIChatCompletionPayload
+) {
+  const response = await OpenAIChatCompletionRequest(payload);
+
+  return response;
+}
+
+export async function transcribeAudioLocal(filePath: string) {
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      function prepareTranscription(data: string) {
+        if (!/^\[.*?-->.*?\]/g.test(data)) return;
+        let text = data.replace(/^\[.*?\]/g, "");
+        controller.enqueue(encoder.encode(text));
+      }
+
+      // let proc = spawn(`${process.env.WHISPER_PYTHON_BIN}`, ["decode.py"], {
+      //   cwd: "./backend/whisper",
+      //   shell: true,
+      //   stdio: "inherit",
+      // });
+      let options: Options = {
+        mode: "text",
+        pythonPath: process.env.WHISPER_PYTHON_BIN,
+        pythonOptions: ["-u"], // get print results in real-time
+        scriptPath: "./backend/whisper/",
+      };
+
+      const shell = new PythonShell("decode.py", options);
+      shell.on("error", (err) => console.log(err));
+      shell.on("message", function (message) {
+        prepareTranscription(message);
+      });
+
+      shell.on("stderr", (err) => console.log(err));
+
+      shell.on("close", () => {
+        console.log("done");
+      });
+    },
+  });
 }
