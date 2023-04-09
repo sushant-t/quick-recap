@@ -14,7 +14,8 @@ function Summary() {
   const generateSummary = async (
     e: any,
     url: string,
-    file: ReadableStream | undefined
+    file: ReadableStream | undefined,
+    acc: string
   ) => {
     e.preventDefault();
     setLoading(true);
@@ -27,6 +28,7 @@ function Summary() {
       body: JSON.stringify({
         vidURL: url,
         vidStream: file,
+        acc: acc,
       }),
     });
 

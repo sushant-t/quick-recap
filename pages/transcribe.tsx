@@ -16,7 +16,8 @@ function Transcribe() {
   const generateTranscription = async (
     e: any,
     url: string,
-    file: ReadableStream | undefined
+    file: ReadableStream | undefined,
+    acc: string
   ) => {
     e.preventDefault();
     if (!(url || file)) return;
@@ -35,6 +36,7 @@ function Transcribe() {
       body: JSON.stringify({
         vidURL: url,
         vidStream: file,
+        acc: acc,
       }),
     });
 

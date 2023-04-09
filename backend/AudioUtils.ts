@@ -15,7 +15,7 @@ export async function downloadAudio(
   url: string,
   saveFile: string
 ): Promise<string> {
-  if (fs.existsSync(saveFile)) return saveFile;
+  // if (fs.existsSync(saveFile)) return saveFile;
   return new Promise(async (resolve) => {
     console.log("dwonloading");
     try {
@@ -55,7 +55,7 @@ export async function summarizeAudioTranscript(
   return response;
 }
 
-export async function transcribeAudioLocal(filePath: string) {
+export async function transcribeAudioLocal(filePath: string, acc: string) {
   const encoder = new TextEncoder();
   return new ReadableStream({
     start(controller) {
@@ -65,18 +65,15 @@ export async function transcribeAudioLocal(filePath: string) {
         controller.enqueue(encoder.encode(text));
       }
 
-      // let proc = spawn(`${process.env.WHISPER_PYTHON_BIN}`, ["decode.py"], {
-      //   cwd: "./backend/whisper",
-      //   shell: true,
-      //   stdio: "inherit",
-      // });
       let options: Options = {
         mode: "text",
         pythonPath: process.env.WHISPER_PYTHON_BIN,
         pythonOptions: ["-u"], // get print results in real-time
         scriptPath: "./backend/whisper/",
+        args: [`--model_size=${acc}`],
       };
 
+      console.log(`using ${acc} model...`);
       const shell = new PythonShell("decode.py", options);
       shell.on("error", (err) => console.log(err));
       shell.on("message", function (message) {

@@ -15,9 +15,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  const { vidURL, vidStream } = req.body;
+  const { vidURL, vidStream, acc } = req.body;
 
-  if (!vidURL && !vidStream) {
+  if (!vidURL && !vidStream && !acc) {
     return new Response("No vid in the request", { status: 400 });
   }
 
@@ -27,15 +27,7 @@ export default async function handler(
     console.log("video downloaded");
   }
 
-  // const payload: OpenAIAudioTranscriptionPayload = {
-  //   file: path ? createReadStream(path) : vidStream,
-  //   model: "whisper-1",
-  //   responseFormat: "text",
-  // };
-
-  // const response = await OpenAIAudioTranscriptionRequest(payload);
-
-  const stream = await transcribeAudioLocal(path);
+  const stream = await transcribeAudioLocal(path, acc);
 
   const reader = stream.getReader();
   let done = false;

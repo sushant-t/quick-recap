@@ -5,17 +5,18 @@ type InputFormProps = {
   onSubmit: any;
   submitText: any;
 };
+
+const options = [
+  { value: "tiny", label: "Weakest" },
+  { value: "base", label: "Weak" },
+  { value: "small", label: "Average" },
+  { value: "medium", label: "Strong" },
+];
 function InputForm(props: InputFormProps) {
   const { onSubmit, submitText } = props;
   const [url, setURL] = useState("");
   const [file, setFile] = useState<ReadableStream | undefined>(undefined);
-
-  const options = [
-    { value: "tiny", label: "Weakest" },
-    { value: "base", label: "Weak" },
-    { value: "small", label: "Average" },
-    { value: "medium", label: "Strong" },
-  ];
+  const [acc, setAcc] = useState("");
 
   const setFilePath = async (e: ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
@@ -24,7 +25,7 @@ function InputForm(props: InputFormProps) {
     setFile(buffer);
   };
   return (
-    <form id="transcribeForm" onSubmit={(e) => onSubmit(e, url, file)}>
+    <form id="transcribeForm" onSubmit={(e) => onSubmit(e, url, file, acc)}>
       <div className="flex mt-10 space-x-1">
         <p className="text-left font-medium">URL</p>
       </div>
@@ -53,7 +54,13 @@ function InputForm(props: InputFormProps) {
       </div>
       <div className="flex justify-center">
         <div className="mb-3 w-full">
-          <Select options={options} />
+          <Select
+            options={options}
+            onChange={(e) => setAcc(e!.value)}
+            name="accSelect"
+            instanceId="accSelect"
+            required
+          />
         </div>
       </div>
       <button
