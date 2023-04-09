@@ -101,7 +101,6 @@ export async function OpenAIChatCompletionRequest(
       });
 
       stream.on("end", () => {
-        controller.close();
         return;
       });
     },

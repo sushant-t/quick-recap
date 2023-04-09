@@ -87,6 +87,8 @@ export async function transcribeAudioLocal(filePath: string) {
 
       shell.on("close", () => {
         console.log("done");
+        controller.close();
+        return;
       });
     },
   });
