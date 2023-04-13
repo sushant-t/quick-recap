@@ -68,15 +68,16 @@ export default async function handler(
     const { value, done: doneReading } = await reader.read();
     done = doneReading;
     const chunkValue = decoder.decode(value);
-    if (/^backend: /g.test(chunkValue)) {
+    if (!chunkValue) continue;
+    if (/\|\|backend: (.*?)\|\|/g.test(chunkValue)) {
       await resWrite(chunkValue, 100);
     } else {
-      await resWrite(`backend: message_length=${chunkValue.length}`, 100);
+      await resWrite(`||backend: message_length=${chunkValue.length}||`, 50);
       if (writeFast) {
         await resWrite(chunkValue, 50);
       } else {
-        for (let i = 0; i < chunkValue.length; i++) {
-          await resWrite(chunkValue[i], 5);
+        for (let i = 0; i < chunkValue.length; i += 3) {
+          await resWrite(chunkValue.substring(i, i + 3), 5);
         }
       }
     }

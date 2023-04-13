@@ -30,7 +30,7 @@ export async function downloadAudio(
             `Downloading audio... ${((downloaded / total) * 100).toFixed(2)}%`
           );
           res.write(
-            `backend: audio_download=${(downloaded / total).toFixed(4)}`
+            `||backend: audio_download=${(downloaded / total).toFixed(4)}||`
           );
         })
         .pipe(fs.createWriteStream(saveFile))
@@ -79,7 +79,7 @@ export async function transcribeAudioLocal(filePath: string, acc: string) {
   return new ReadableStream({
     start(controller) {
       function prepareTranscription(data: string) {
-        if (!/^(backend: |\[.*?-->.*?\] )/g.test(data)) return;
+        if (!/^(\|\|backend: (.*?)\|\||\[.*?-->.*?\] )/g.test(data)) return;
         let text = data.replace(/^\[.*?\] /g, "");
         console.log(text);
         controller.enqueue(encoder.encode(text));

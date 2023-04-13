@@ -18,6 +18,14 @@ function Transcribe() {
 
   const TYPING_RATE = 5;
 
+  const bioRef = useRef<null | HTMLDivElement>(null);
+
+  const scrollToBios = () => {
+    if (bioRef.current !== null) {
+      bioRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   const generateTranscription = async (
     e: any,
     url: string,
@@ -80,11 +88,10 @@ function Transcribe() {
     let messageLength = 0;
     let audioDownload = 0;
 
-    let audio_download_start = url ? 30 : undefined;
-    let transcript_start = audio_download_start ? 50 : 30;
+    let audio_download_start = url ? 10 : undefined;
+    let transcript_start = audio_download_start ? 30 : 10;
     let transcript_end = 100;
 
-    let transcripts: string[] = [];
     setProgress(audio_download_start || transcript_start);
     setLoading(true);
     while (!done) {
@@ -95,8 +102,11 @@ function Transcribe() {
         setStatus(chunkValue.replace(/^info: /g, ""));
         continue;
       }
-      if (/^backend: /g.test(chunkValue)) {
-        let params = new URLSearchParams(chunkValue.replace(/^backend: /g, ""));
+      if (/\|\|backend: (.*?)\|\|/g.test(chunkValue)) {
+        let params = new URLSearchParams(
+          chunkValue.match(/\|\|backend: (.*?)\|\|/)![1]
+        );
+        if (chunkValue.includes("message")) console.log(chunkValue);
         if (params.get("audio_duration"))
           audioDuration = parseFloat(params.get("audio_duration")!);
         if (params.get("message_length"))
@@ -115,8 +125,11 @@ function Transcribe() {
             )
           );
         }
-        continue;
+        chunkValue = chunkValue.replace(/\|\|backend: (.*?)\|\|/g, "");
       }
+
+      if (!chunkValue) continue;
+
       if (audioDuration && messageLength)
         setProgress((prev) =>
           Math.min(
@@ -135,103 +148,15 @@ function Transcribe() {
         firstChunk = false;
         chunkValue = chunkValue.trimStart();
       }
-      // console.log("setting transcripts", transcripts.length);
-      transcripts.push(chunkValue);
-      setText((prev) => prev + chunkValue);
 
-      // setCurrentTranscript(chunkValue);
+      scrollToBios();
+      setText((prev) => prev + chunkValue);
     }
 
     setProgress(100);
     setStatus("Finished");
     // setLoading(false);
   };
-  // let inProgress = false;
-  // const progressState = (state: boolean) => {
-  //   if (state) inProgress = state;
-  //   console.log("progrss", inProgress);
-  //   return inProgress;
-  // };
-
-  // // let vars: {
-  // //   transcript: string[] | undefined;
-  // //   setTranscript: Function | undefined;
-  // //   timeout: any;
-  // // } = {
-  // //   transcript: undefined,
-  // //   setTranscript: undefined,
-  // //   timeout: undefined,
-  // // }; // mutability purposes
-  // let transcript = useRef<string[] | null>(null);
-  // let setTranscript = useRef<Function | null>(null);
-  // let timeout = useRef<any>(null);
-  // const updateTranscript = (transcripts: string[]) => {
-  //   if (timeout.current) return;
-  //   timeout.current = setTimeout(transcriptFunc, 500, transcripts);
-  // };
-
-  // const transcriptFunc = (transcripts: string[]) => {
-  //   if (inProgress == false && transcript.current && setTranscript.current) {
-  //     clearTimeout(timeout.current);
-  //     setTranscript.current([
-  //       ...transcript.current,
-  //       ...transcripts.slice(transcript.current.length),
-  //     ]);
-  //     timeout.current = null;
-  //   } else {
-  //     setTimeout(transcriptFunc, 500);
-  //   }
-  // };
-
-  // const updateTranscriptsChild = (child: any[]) => {
-  //   transcript.current = child[0];
-  //   setTranscript.current = child[1];
-  // };
-
-  // const updateTranscriptSmooth = () => {
-  //   // console.log("t", transcripts.length);
-  //   if (transcripts.length) {
-  //     // console.log(transcripts[0].substring(0, 10));
-  //     setLoading(true);
-  //     setCurrentTranscript(transcripts[0] as string);
-  //     setTranscripts(transcripts.slice(1));
-  //     // setTranscripts(transcripts);
-  //     setTranscriptIndex(0);
-  //   }
-  // };
-
-  // useEffect(() => {
-  //   if (!currentTranscript) return;
-  //   setTimeout(function updateTimeout() {
-  //     if (transcriptIndex >= currentTranscript.length) {
-  //       setLoading(false);
-  //       return;
-  //     }
-  //     setText(
-  //       (prev) =>
-  //         prev +
-  //         currentTranscript.substring(
-  //           transcriptIndex,
-  //           Math.min(
-  //             transcriptIndex + TYPING_RATE + 1,
-  //             currentTranscript.length
-  //           )
-  //         )
-  //     );
-  //     setTranscriptIndex(transcriptIndex + TYPING_RATE + 1);
-  //   }, 20);
-  // }, [transcriptIndex]);
-
-  // useEffect(() => {
-  //   if (loading == false) {
-  //     updateTranscriptSmooth();
-  //   }
-  // }, [loading]);
-
-  // useEffect(() => {
-  //   // console.log(loading, transcripts.length);
-  //   if (loading == false && transcripts.length) updateTranscriptSmooth();
-  // }, [transcripts]);
 
   return (
     <>
@@ -250,10 +175,7 @@ function Transcribe() {
             toastOptions={{ duration: 2000 }}
           />
           {progVisible ? (
-            <ProgressBar
-              progress={parseInt(progress.toFixed(2))}
-              status={status}
-            />
+            <ProgressBar progress={progress} status={status} />
           ) : null}
           <div className="space-y-10 my-10">
             {text && (
@@ -274,6 +196,7 @@ function Transcribe() {
                 >
                   <p className={styles.transcription}>{text}</p>
                 </div>
+                <div ref={bioRef} />
               </>
             )}
           </div>

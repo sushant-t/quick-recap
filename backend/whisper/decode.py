@@ -20,7 +20,7 @@ def main():
 
     audio = whisper.load_audio("../../video.mp3")
 
-    print("backend: audio_duration={0}".format(get_audio_duration(audio)))
+    print("||backend: audio_duration={0}||".format(get_audio_duration(audio)))
     trimmed_audio = whisper.pad_or_trim(audio)
     mel = whisper.log_mel_spectrogram(trimmed_audio).to(model.device)
 
