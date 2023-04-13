@@ -59,6 +59,8 @@ export default async function handler(
 
   // res.write("info: generating transcript");
 
+  const writeFast = req.headers["x-fast"] === "true";
+
   const reader = stream.getReader();
   let done = false;
   const decoder = new TextDecoder();
@@ -70,8 +72,12 @@ export default async function handler(
       await resWrite(chunkValue, 100);
     } else {
       await resWrite(`backend: message_length=${chunkValue.length}`, 100);
-      for (let i = 0; i < chunkValue.length; i++) {
-        await resWrite(chunkValue[i], 5);
+      if (writeFast) {
+        await resWrite(chunkValue, 50);
+      } else {
+        for (let i = 0; i < chunkValue.length; i++) {
+          await resWrite(chunkValue[i], 5);
+        }
       }
     }
   }

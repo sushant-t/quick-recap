@@ -1,43 +1,65 @@
 import InputForm from "@/components/InputForm";
 import Head from "next/head";
-import React, { useState } from "react";
+import React, { createContext, useEffect, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import styles from "@/styles/Summary.module.css";
+import ProgressBar from "@/components/ProgressBar";
 
 function Summary() {
-  const [loading, setLoading] = useState(false);
+  const [_, setLoading] = useState(false);
   const [text, setText] = useState("");
-  const [transcript, setTranscript] = useState("");
+
+  const [progVisible, setProgVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState("");
 
   const maxTokens = 600;
 
   const generateSummary = async (
     e: any,
     url: string,
-    file: ReadableStream | undefined,
+    file: File | undefined,
     acc: string
   ) => {
     e.preventDefault();
     setLoading(true);
     setText("");
-    let response = await fetch("/api/transcribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        vidURL: url,
-        vidStream: file,
-        acc: acc,
-      }),
-    });
+
+    setProgress(0);
+    setProgVisible(true);
+    setStatus("Downloading video");
+
+    let response;
+    if (file) {
+      const body = new FormData();
+      body.append("file", file);
+      response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: {
+          "x-accuracy": acc,
+          "x-fast": "true",
+        },
+        body,
+      });
+    } else {
+      response = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-accuracy": acc,
+          "x-fast": "true",
+        },
+        body: JSON.stringify({
+          vidURL: url,
+        }),
+      });
+    }
 
     if (!response.ok) {
       throw new Error(response.statusText);
     }
 
     // This data is a ReadableStream
-    console.log(response.body);
     let data = response.body;
     if (!data) {
       return;
@@ -49,23 +71,75 @@ function Summary() {
 
     let firstChunk = true;
 
-    console.log("parsing transcript");
+    let audioDuration = 0;
+    let messageLength = 0;
+    let audioDownload = 0;
+
+    let audio_download_start = url ? 10 : undefined;
+    let transcript_start = audio_download_start ? 30 : 10;
+    let transcript_end = 70;
+
+    console.log("setting progress", audio_download_start || transcript_start);
+    setProgress(audio_download_start || transcript_start);
+
     let total = "";
     while (!done) {
       const { value, done: doneReading } = await reader.read();
       done = doneReading;
       let chunkValue = decoder.decode(value);
+      if (/^info: /g.test(chunkValue)) {
+        setStatus(chunkValue.replace(/^info: /g, ""));
+        continue;
+      }
+      if (/^backend: /g.test(chunkValue)) {
+        let params = new URLSearchParams(chunkValue.replace(/^backend: /g, ""));
+        console.log(params);
+        if (params.get("audio_duration"))
+          audioDuration = parseFloat(params.get("audio_duration")!);
+        if (params.get("message_length"))
+          messageLength = parseInt(params.get("message_length")!);
+        if (params.get("audio_download")) {
+          audioDownload = parseFloat(params.get("audio_download")!);
+          setProgress((prev) =>
+            Math.min(
+              parseFloat(
+                (
+                  prev +
+                  audioDownload * (transcript_start - audio_download_start!)
+                ).toFixed(2)
+              ),
+              transcript_start
+            )
+          );
+        }
+        continue;
+      }
+
+      if (audioDuration && messageLength)
+        setProgress((prev) =>
+          Math.min(
+            parseFloat(
+              (
+                prev +
+                (chunkValue.length / messageLength) *
+                  (30 / audioDuration) *
+                  (transcript_end - transcript_start)
+              ).toFixed(2)
+            ),
+            transcript_end
+          )
+        );
       if (firstChunk) {
         firstChunk = false;
         chunkValue = chunkValue.trimStart();
       }
+
       total += chunkValue;
     }
 
     // setTranscript(total);
 
-    console.log("transcript saved, generating summary");
-
+    setStatus("Generating summary");
     const summaryPrompt = `Generate a summary USING BULLET POINTS of a video with the following transcript: ${total}`;
     response = await fetch("/api/summarize", {
       method: "POST",
@@ -93,18 +167,37 @@ function Summary() {
     let priorChunk = "";
     firstChunk = true;
 
-    console.log("setting summary");
+    let summary_start = transcript_end;
+    let summary_end = 100;
+
+    setProgress(summary_start);
+
+    let interval = setInterval(
+      () =>
+        setProgress(
+          (prev) =>
+            prev +
+            Math.floor(
+              ((summary_end - prev) / summary_end) * (summary_end - prev)
+            )
+        ),
+      500
+    );
+
     while (!done) {
       const { value, done: doneReading } = await reader.read();
       done = doneReading;
       let chunkValue = decoder.decode(value);
       if (firstChunk || priorChunk.substring(priorChunk.length - 1) == "\n")
         chunkValue = chunkValue.replace("-", "\u2022");
-      console.log(chunkValue);
       setText((prev) => prev + chunkValue);
       priorChunk = chunkValue;
       firstChunk = false;
     }
+
+    clearInterval(interval);
+    setProgress(summary_end);
+    setStatus("Finished");
     setLoading(false);
   };
   return (
@@ -115,6 +208,7 @@ function Summary() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
+
       <main className={styles.main}>
         <div className="flex w-9/12 flex-col mx-auto py-2 min-h-screen">
           <InputForm onSubmit={generateSummary} submitText="Summarize" />
@@ -123,6 +217,9 @@ function Summary() {
             reverseOrder={false}
             toastOptions={{ duration: 2000 }}
           />
+          {progVisible ? (
+            <ProgressBar progress={progress} status={status} />
+          ) : null}
           <div className="space-y-10 my-10">
             {text && (
               <>
@@ -136,7 +233,7 @@ function Summary() {
                     className="bg-white rounded-xl shadow-md p-4 hover:bg-gray-100 transition cursor-copy border"
                     onClick={() => {
                       navigator.clipboard.writeText(text.toString());
-                      toast("Transcript copied to clipboard", {
+                      toast("Summary copied to clipboard", {
                         icon: "✂️",
                       });
                     }}
