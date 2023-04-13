@@ -13,7 +13,7 @@ function Summary() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
 
-  const maxTokens = 600;
+  const maxTokens = 1000;
 
   const generateSummary = async (
     e: any,
@@ -79,7 +79,6 @@ function Summary() {
     let transcript_start = audio_download_start ? 30 : 10;
     let transcript_end = 70;
 
-    console.log("setting progress", audio_download_start || transcript_start);
     setProgress(audio_download_start || transcript_start);
 
     let total = "";
@@ -91,9 +90,10 @@ function Summary() {
         setStatus(chunkValue.replace(/^info: /g, ""));
         continue;
       }
-      if (/^backend: /g.test(chunkValue)) {
-        let params = new URLSearchParams(chunkValue.replace(/^backend: /g, ""));
-        console.log(params);
+      if (/\|\|backend: (.*?)\|\|/g.test(chunkValue)) {
+        let params = new URLSearchParams(
+          chunkValue.match(/\|\|backend: (.*?)\|\|/)![1]
+        );
         if (params.get("audio_duration"))
           audioDuration = parseFloat(params.get("audio_duration")!);
         if (params.get("message_length"))
@@ -112,8 +112,10 @@ function Summary() {
             )
           );
         }
-        continue;
+        chunkValue = chunkValue.replace(/\|\|backend: (.*?)\|\|/g, "");
       }
+
+      if (!chunkValue) continue;
 
       if (audioDuration && messageLength)
         setProgress((prev) =>
@@ -140,7 +142,7 @@ function Summary() {
     // setTranscript(total);
 
     setStatus("Generating summary");
-    const summaryPrompt = `Generate a summary USING BULLET POINTS of a video with the following transcript: ${total}`;
+    const summaryPrompt = `I want you to summarize a video for me based on its transcript. Structure your response into a bulleted list. The longer the video transcript, the more summary points I want you to include. The transcript for the video is as follows: "${total}"`;
     response = await fetch("/api/summarize", {
       method: "POST",
       headers: {

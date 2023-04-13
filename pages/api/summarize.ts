@@ -31,8 +31,6 @@ export default async function handler(
     n: 1,
   };
 
-  console.log(payload);
-
   const stream = await OpenAIChatCompletionRequest(payload);
 
   res.status(200);
@@ -44,7 +42,6 @@ export default async function handler(
     const { value, done: doneReading } = await reader.read();
     done = doneReading;
     const chunkValue = decoder.decode(value);
-    console.log(chunkValue);
     res.write(chunkValue);
   }
   res.end();
