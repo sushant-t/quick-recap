@@ -85,7 +85,7 @@ function Transcribe() {
     let transcript_end = 100;
 
     let transcripts: string[] = [];
-    setProgress(transcript_start);
+    setProgress(audio_download_start || transcript_start);
     setLoading(true);
     while (!done) {
       const { value, done: doneReading } = await reader.read();
