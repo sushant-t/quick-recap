@@ -1,4 +1,4 @@
-import ytdl, { downloadOptions } from "ytdl-core";
+import ytdl from "ytdl-core";
 import * as fs from "fs";
 import {
   OpenAIAudioTranscriptionPayload,
@@ -7,13 +7,15 @@ import {
   OpenAIChatCompletionRequest,
 } from "./OpenAIRequest";
 
-import { exec, spawn } from "child_process";
-
 import { Options, PythonShell } from "python-shell";
+import { IncomingForm } from "formidable";
+import { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
+import PersistentFile from "formidable/PersistentFile";
 
 export async function downloadAudio(
   url: string,
-  saveFile: string
+  saveFile: string,
+  res: NextApiResponse
 ): Promise<string> {
   // if (fs.existsSync(saveFile)) return saveFile;
   return new Promise(async (resolve) => {
@@ -23,11 +25,14 @@ export async function downloadAudio(
         filter: "audioonly",
         quality: "lowestaudio",
       })
-        .on("progress", ({}, downloaded, total) =>
+        .on("progress", ({}, downloaded, total) => {
           console.log(
             `Downloading audio... ${((downloaded / total) * 100).toFixed(2)}%`
-          )
-        )
+          );
+          res.write(
+            `backend: audio_download=${(downloaded / total).toFixed(4)}`
+          );
+        })
         .pipe(fs.createWriteStream(saveFile))
         .on("finish", () => {
           console.log("file downloaded");
@@ -36,6 +41,20 @@ export async function downloadAudio(
     } catch (err) {
       console.log(err);
     }
+  });
+}
+
+export async function downloadAudioLocal(
+  req: NextApiRequest,
+  saveFile: string
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const form = new IncomingForm();
+    form.parse(req, async function (err, fields, files) {
+      if (err) reject(err);
+      fs.writeFileSync(saveFile, fs.readFileSync((files.file as any).filepath));
+      resolve(saveFile);
+    });
   });
 }
 
@@ -60,8 +79,9 @@ export async function transcribeAudioLocal(filePath: string, acc: string) {
   return new ReadableStream({
     start(controller) {
       function prepareTranscription(data: string) {
-        if (!/^\[.*?-->.*?\]/g.test(data)) return;
-        let text = data.replace(/^\[.*?\]/g, "");
+        if (!/^(backend: |\[.*?-->.*?\] )/g.test(data)) return;
+        let text = data.replace(/^\[.*?\] /g, "");
+        console.log(text);
         controller.enqueue(encoder.encode(text));
       }
 

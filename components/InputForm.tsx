@@ -15,14 +15,13 @@ const options = [
 function InputForm(props: InputFormProps) {
   const { onSubmit, submitText } = props;
   const [url, setURL] = useState("");
-  const [file, setFile] = useState<ReadableStream | undefined>(undefined);
+  const [file, setFile] = useState<File | undefined>(undefined);
   const [acc, setAcc] = useState("");
 
   const setFilePath = async (e: ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (fileList?.length == 0) return;
-    const buffer = fileList![0].stream();
-    setFile(buffer);
+    setFile(fileList![0]);
   };
   return (
     <form id="transcribeForm" onSubmit={(e) => onSubmit(e, url, file, acc)}>
